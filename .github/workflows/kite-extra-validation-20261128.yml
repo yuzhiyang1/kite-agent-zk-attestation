@@ -1,0 +1,33 @@
+name: Exact source extra validation
+on:
+  push:
+    branches: [codex/validate-zk-extra-20261128]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 4ebecc2f4a160ee47afa3e81dbbf5352cfe5e118
+      - name: Verify exact source commit
+        run: test "$(git rev-parse HEAD)" = "4ebecc2f4a160ee47afa3e81dbbf5352cfe5e118"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Try canonical locked installation
+        id: canonical
+        continue-on-error: true
+        run: npm ci
+      - name: Use documented installation for pre-existing bundled platform dependency failure
+        if: steps.canonical.outcome == 'failure'
+        run: npm install --ignore-scripts --package-lock=false
+      - name: Keep tracked dependency manifests unchanged
+        run: git diff --exit-code -- package.json package-lock.json
+      - run: npm test -- --maxWorkers 1 --minWorkers 1
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:contracts
